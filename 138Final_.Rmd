@@ -1,0 +1,109 @@
+---
+title: "Final Project"
+author: "Lijing Xu"
+date: "2018/3/13"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+###1. Introduction.
+######Depression is a disease that affects millions of people around the world. It is the disease of the 21st century. But this was not always the case. Depression as an endemic problem only started from the 21st century.So that we are is going to analyze the relationship between depression and some other variables in primary care.To study factors related to the diagnosis of depression in primary care, 400 patients were randomly selected and the following variables were recorded: DAV, PCS, MCS, BECK, PGEND, AGE, and EDUCAT.
+
+
+###2. Material and Method
+######The dataset is included 400 patients with one response variable(diagnosed "1" and not diagnosed "0") and six explanatory variables.  
+######1. pcs: physical component of SF-36 measuring health care of the patient (a continuous variable)
+######2. mcs: mental component of SF-36 measuring health status of the patient (a continuous variable)
+######3. beck: the beck depression score (a continuous variable)
+######4. pgend: patient's gender (a categorical variable)
+######5. age: patient's age in years (a continuous variable)
+######6. educat: total years of formal schooling
+######Because the response variable is categorical, in this report we will perform a multiple logistic regression analysis of this data using R. This includes estimation, hypothesis testing, model selection, odds ratios, residual analysis and diagnostics.
+
+###3. Results
+```{r}
+patient=read.table("http://www.stat.ucdavis.edu/~azari/sta138/final.dat", header = TRUE)
+names(patient)=c('dav','pcs','mcs','beck','pgend','age','educat')
+plot(patient[,1:7])
+```
+###### I plotted this graph to look for which two variables that are almost linear to each other. I could not be 100 percent sure which two variables that are likely linear to each other by observing the graph; however, the "MCS" and "BECK" seems like have the highest collinearity.
+
+#####Forward Selection
+######In the next step, I build the model with the forward selection method. The "step" function is the essential way to do it, which used AIC by default as the criterion. At each step, the function will compute AIC for each model with one additional explanatory variable and choose the one that lowers AIC the most. If none of the variables improves AIC, the current model will be the final model.
+
+```{r}
+fit.null=glm(dav~1, data=patient, family = binomial)
+fit.forward=step(fit.null, scope =
+                   ~pcs+mcs+beck+pgend+age+educat,direction = 'forward')
+summary(fit.forward)
+```
+
+#####Backward Selection
+######Here our final model is the one with 'MCS', 'EDUCAT', 'BECK', 'PGEND' and 'AGE'. In the next step, I will begin with the full model and use the backward elimination method. The criterion is still AIC here and we stop when eliminating any variable in the model would increase AIC. 
+
+```{r}
+fit.full=glm(dav~.,data = patient, family = binomial)
+fit.backward=step(fit.full, scope = ~1, direction = 'backward')
+summary(fit.backward)
+```
+#####Both Selection
+######The more ideal way is to check both adding and eliminating a variable at each step. We can do that similarly to the code for forward selection except the ???direction??? argument will be ???both???.
+```{r}
+fit.both=step(fit.null,
+              scope=~pcs+mcs+beck+pgend+age+educat,
+              direction = 'both')
+summary(fit.both)
+```
+######The three model selections indicated that five variables are significant, include MCS EDUCAT BECK PEGND AGE which give us same model.
+
+```{r}
+final.model=glm(formula = dav ~ mcs + beck + pgend + age + educat, family = binomial, 
+          data = patient)
+summary(final.model)
+#anova(final.model, test = 'LRT')
+#anova(final.model, test = 'Rao')
+
+#confint(final.model)
+```
+
+#####H0: the models does fitted 
+#####Ha: the models does not fitted
+```{r}
+#####Diagnostics
+library(ResourceSelection)
+hoslem.test(fit.both$y, fitted(fit.both), g=10)
+```
+######As we can see the p-value = 0.3316 which is larger than the alpha(0.05), then we reject alternattive hypothesis and the model fits well. Next I'm going to use the wald test to get the confident interval:
+#####Wald-type Confident Interval
+```{r}
+##### 95% Wald.CI 
+coe1 = summary(fit.both)$coefficients[,1]
+coe2 = summary(fit.both)$coefficients[,2]
+Wald.CI = cbind(coe1-qnorm(1-0.05/2)*coe2,coe1+qnorm(1-0.05/2)*coe2)
+Wald.CI
+```
+
+#####The Odd Ratio
+```{r}
+exp(coef(fit.both))
+```
+######I am 95% confident that increased one unit in mcs will make change in the odds of having diagnosed with depression around 0.9264496 to 0.9825968 times. The odd of having diagnosed with depression when X=1 is 0.9541 times as the odd when X=0. The other factor are same as MCS.
+
+
+#####The Residual Plot
+```{r}
+plot(residuals(fit.both), ylim = c(-2,2))
+abline(h=0,lty=5)
+```
+######As we can see, the plot show that there are few outlier because we just want residuals to be randomly scattered around 0 and between 2. There also is lots of patients that is confrom to the fitted modle, but only few is contracdict agains the fitted model. 
+
+###4. Conclusion
+######In this report, I used the selecting model method to chose the fitted model. It's was analysis by choose the lowest AIC and the Hosmer-Lemeshow goodness(GOF) of fit test at 0.05 significance level. However, the Hosmer and Lemeshow goodness of fit test and Wald CI also support the null hypothesis test at 0.05 significant level. When I calculated the conditional odd ratios, the factor of the MCS equal to 0.9541, it means the odd of diagnosis of depression would decrease 0.9541 when the MCS increase by one unit.
+######In addition, according to the odds ratio, we get the effect of mental component score of depression and number of years of formal schooling are found to be significant. The predicted value ??(x) would decreases with increasing number of MCS and decreasing Beck depression score, age and number of years of formal schooling. 
+
+
+
